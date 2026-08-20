@@ -55,10 +55,25 @@ cmd/covert    CLI (init / join)
 ## Testing
 
 ```sh
-go test ./...
+make test        # fast: unit tests + in-process multi-peer integration tests
+make test-e2e     # slow: real `covert init`/`covert join` subprocesses + real jj commits
+make test-all     # everything
 ```
 
-`pkg/crdt` has the load-bearing tests: commutative concurrent inserts,
-majority vote, priority-chain tiebreak, rejoin demotion, and same-line
-concurrent edits correctly contending as proposals (not silently becoming
-two separate lines).
+Four layers, cheapest first:
+
+1. **Unit tests**, one `_test.go` per package. `pkg/crdt` has the
+   load-bearing ones: commutative concurrent inserts, majority vote,
+   priority-chain tiebreak, rejoin demotion, and same-line concurrent edits
+   correctly contending as proposals (not silently becoming two separate
+   lines).
+2. **`internal/covertest`** — an in-process multi-peer harness (real temp
+   dirs, real `jj` repos, real loopback TCP, no subprocesses) that
+   `pkg/session`'s tests build on.
+3. **`pkg/session` integration tests** — 2-3 peer clusters via
+   `internal/covertest`: concurrent edits, mid-session joins, rejoin
+   demotion, delete-vs-concurrent-edit.
+4. **`cmd/covert` end-to-end test** — the real compiled binary, `init` and
+   `join` as actual subprocesses, real filesystem writes and debounce
+   timers. Gated behind `-short` (see `make test` vs `make test-e2e`) since
+   it's the slowest layer by a wide margin.
